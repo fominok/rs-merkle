@@ -10,7 +10,7 @@ use crate::{partial_tree::PartialTree, utils, utils::indices, Hasher, MerkleProo
 /// can be found in databases and file systems.
 #[derive(Clone)]
 pub struct MerkleTree<T: Hasher> {
-    current_working_tree: PartialTree<T>,
+    pub current_working_tree: PartialTree<T>,
     history: Vec<PartialTree<T>>,
     uncommitted_leaves: Vec<T::Hash>,
 }
@@ -516,6 +516,19 @@ impl<T: Hasher> MerkleTree<T> {
         0
     }
 
+    /// Returns an iterator over nodes of the tree.
+    ///
+    /// Could be used to build a copy of the tree in a streaming fasion.
+    ///
+    /// TODO: add examples
+    pub fn nodes_iter(&self) -> NodesIter<T::Hash> {
+        NodesIter {
+            layers: self.current_working_tree.layers(),
+            layer_idx: 0,
+            node_idx: 0,
+        }
+    }
+
     fn leaves_tuples(&self) -> Option<&[(usize, T::Hash)]> {
         Some(self.layer_tuples().first()?.as_slice())
     }
@@ -568,5 +581,32 @@ impl<T: Hasher> MerkleTree<T> {
 
         // Building a partial tree with the changes that would be needed to the working tree
         PartialTree::<T>::build(partial_tree_tuples, uncommitted_tree_depth).ok()
+    }
+}
+
+pub struct NodesIter<'a, T> {
+    layers: &'a [Vec<(usize, T)>],
+    layer_idx: usize,
+    node_idx: usize,
+}
+
+impl<'a, T> Iterator for NodesIter<'a, T> {
+    type Item = (usize, usize, &'a T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let item = self
+            .layers
+            .get(self.layer_idx)
+            .and_then(|layer| layer.get(self.node_idx))
+            .map(|item| (self.layer_idx, item.0, &item.1));
+        if item.is_some() {
+            if self.node_idx + 1 == self.layers[self.layer_idx].len() {
+                self.layer_idx += 1;
+                self.node_idx = 0;
+            } else {
+                self.node_idx += 1;
+            }
+        }
+        item
     }
 }

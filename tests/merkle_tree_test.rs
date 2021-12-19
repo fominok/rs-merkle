@@ -32,6 +32,51 @@ pub mod tree_depth {
     }
 }
 
+pub mod nodes_iter {
+    use crate::common;
+    use rs_merkle::{algorithms::Sha256, Hasher, MerkleTree};
+
+    #[test]
+    pub fn should_iterate_over_nodes_properly() {
+        let test_data = common::setup();
+
+        let merkle_tree = MerkleTree::<Sha256>::from_leaves(&test_data.leaf_hashes);
+
+        let hash_a = Sha256::hash("a".as_bytes());
+        let hash_b = Sha256::hash("b".as_bytes());
+        let hash_c = Sha256::hash("c".as_bytes());
+        let hash_d = Sha256::hash("d".as_bytes());
+        let hash_e = Sha256::hash("e".as_bytes());
+        let hash_f = Sha256::hash("f".as_bytes());
+        let hash_a_b = Sha256::hash(&[hash_a, hash_b].concat());
+        let hash_c_d = Sha256::hash(&[hash_c, hash_d].concat());
+        let hash_e_f = Sha256::hash(&[hash_e, hash_f].concat());
+        let hash_abcd = Sha256::hash(&[hash_a_b, hash_c_d].concat());
+        let root_hash = Sha256::hash(&[hash_abcd, hash_e_f].concat());
+
+        let reference_data = [
+            (0, 0, &hash_a),
+            (0, 1, &hash_b),
+            (0, 2, &hash_c),
+            (0, 3, &hash_d),
+            (0, 4, &hash_e),
+            (0, 5, &hash_f),
+            (1, 0, &hash_a_b),
+            (1, 1, &hash_c_d),
+            (1, 2, &hash_e_f),
+            (2, 0, &hash_abcd),
+            (2, 1, &hash_e_f),
+            (3, 0, &root_hash),
+        ];
+
+        let mut nodes_iter = merkle_tree.nodes_iter();
+        for r in reference_data {
+            assert_eq!(nodes_iter.next().expect("should produce next node"), r);
+        }
+        assert!(nodes_iter.next().is_none());
+    }
+}
+
 pub mod proof {
     use crate::common;
     use rs_merkle::{algorithms::Sha256, MerkleTree};
